@@ -1,0 +1,139 @@
+# sudoers-policy.txt
+
+## Restricted Sudo Policy for Amina
+
+The following policy grants Amina only the privileges required to perform her operational responsibilities while adhering to the Principle of Least Privilege.
+
+```sudoers
+# Restart the KijaniKiosk services only.
+# Prevents restarting arbitrary system services such as ssh,
+# networking, cron, or other privileged services.
+Cmnd_Alias KK_RESTART = \
+    /usr/bin/systemctl restart kk-api,\
+    /usr/bin/systemctl restart kk-payments,\
+    /usr/bin/systemctl restart kk-logs
+
+# View the status of the approved KijaniKiosk services only.
+# Prevents viewing or interacting with unrelated system services.
+Cmnd_Alias KK_STATUS = \
+    /usr/bin/systemctl status kk-api,\
+    /usr/bin/systemctl status kk-payments,\
+    /usr/bin/systemctl status kk-logs
+
+# View logs for the approved services only.
+# Prevents access to journal logs belonging to other services.
+Cmnd_Alias KK_LOGS = \
+    /usr/bin/journalctl -u kk-api,\
+    /usr/bin/journalctl -u kk-payments,\
+    /usr/bin/journalctl -u kk-logs
+
+# Allow safe editing of the nginx configuration.
+# sudoedit edits a temporary copy of the file instead of opening
+# an editor as root, reducing privilege escalation risks.
+Cmnd_Alias NGINX_EDIT = \
+    /usr/bin/sudoedit /etc/nginx/nginx.conf
+
+# Grant only the approved operational commands.
+amina ALL=(root) NOPASSWD: \
+    KK_RESTART, \
+    KK_STATUS, \
+    KK_LOGS, \
+    NGINX_EDIT
+```
+
+## Explanation of the Policy
+
+### KK_RESTART
+
+Allows Amina to restart only the three KijaniKiosk services:
+
+* kk-api
+* kk-payments
+* kk-logs
+
+This prevents restarting or stopping unrelated services such as SSH, networking, cron, or the firewall.
+
+---
+
+### KK_STATUS
+
+Allows Amina to check the operational status of the three approved services.
+
+Restricting the command to specific services prevents unnecessary visibility into other system services.
+
+---
+
+### KK_LOGS
+
+Allows Amina to view journal logs for the three KijaniKiosk services only.
+
+This prevents access to logs from unrelated applications that may contain sensitive information.
+
+---
+
+### NGINX_EDIT
+
+Allows Amina to edit only the nginx configuration using **sudoedit**.
+
+Using **sudoedit** is safer than allowing editors such as `vim` or `nano` to run with root privileges because it edits a temporary copy rather than launching a root-owned editor. This reduces opportunities for shell escapes and privilege escalation.
+
+---
+
+## Escalation Vectors Avoided
+
+This policy intentionally does **not** permit:
+
+* `sudo bash`
+* `sudo sh`
+* `sudo python3`
+* `sudo perl`
+* `sudo ruby`
+* `sudo vim`
+* `sudo nano`
+* unrestricted `systemctl`
+* unrestricted `journalctl`
+
+Restricting these commands prevents users from obtaining an interactive root shell or executing arbitrary commands as root.
+
+---
+
+# Required Attack Scenarios
+
+## Attack Scenario 1: Abuse of Unrestricted systemctl
+
+If Amina were allowed to execute unrestricted `systemctl` commands (for example, `sudo systemctl daemon-reload`), she could create or modify a malicious systemd service that executes arbitrary commands as the root user. After reloading the systemd configuration and starting the service, the malicious code would execute with full administrative privileges.
+
+**Impact**
+
+* Complete root compromise
+* Persistent privilege escalation
+* Ability to install malware or backdoors
+* Full control of the operating system
+
+**How the policy prevents this**
+
+The policy restricts `systemctl` to only the `restart` and `status` subcommands for the three approved KijaniKiosk services. Commands such as `daemon-reload`, `enable`, `disable`, `start`, `stop`, `mask`, `unmask`, and other administrative operations are not permitted.
+
+---
+
+## Attack Scenario 2: Disabling Critical System Services
+
+If unrestricted `systemctl` access were granted, Amina could execute commands such as:
+
+```bash
+sudo systemctl stop ssh
+sudo systemctl mask ssh
+```
+
+Stopping or masking the SSH service would prevent administrators from remotely accessing the production server. Similar attacks could target networking, firewall, monitoring, or logging services, resulting in denial of service and disrupting normal operations.
+
+**Impact**
+
+* Administrative lockout
+* Denial of service
+* Service outages
+* Delayed incident response
+
+**How the policy prevents this**
+
+The sudo policy permits operations only on the `kk-api`, `kk-payments`, and `kk-logs` services. Since no other services are included in the allowed command aliases, attempts to manage SSH or other critical system services are denied.
