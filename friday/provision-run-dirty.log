@@ -1,0 +1,94 @@
+[INFO] === Pre-flight Checks ===
+[ OK ] Environment checks passed.
+[INFO] === Phase 1: Package Installation ===
+Reading package lists...
+Building dependency tree...
+Reading state information...
+curl is already the newest version (8.5.0-2ubuntu10.11).
+gnupg is already the newest version (2.4.4-2ubuntu17.4).
+acl is already the newest version (2.3.2-1build1.1).
+ufw is already the newest version (0.36.2-6).
+0 upgraded, 0 newly installed, 0 to remove and 20 not upgraded.
+[ OK ] Node.js already installed: v18.19.1
+nodejs was already set on hold.
+[ OK ] nginx already installed.
+nginx was already set on hold.
+[ OK ] Installed nginx 1.24.0 (Ubuntu) and Node.js v18.19.1
+[INFO] === Phase 2: Service Accounts ===
+[ OK ] Service accounts and group membership configured successfully.
+[INFO] === Phase 3: Directory Structure ===
+[ OK ] Directory structure, permissions, and ACLs configured successfully.
+[INFO] === Phase 7: Logging Configuration ===
+[ OK ] Persistent journal configured (max 500MB)
+[ OK ] Logrotate configuration written.
+[ OK ] logrotate configuration validated.
+[ OK ] Phase 7 completed successfully.
+[INFO] === Phase 4: systemd Unit Files ===
+[ OK ] kk-api systemd service installed and enabled.
+[INFO] === Phase 5: Firewall Configuration ===
+Backing up 'user.rules' to '/etc/ufw/user.rules.20260730_222031'
+Backing up 'before.rules' to '/etc/ufw/before.rules.20260730_222031'
+Backing up 'after.rules' to '/etc/ufw/after.rules.20260730_222031'
+Backing up 'user6.rules' to '/etc/ufw/user6.rules.20260730_222031'
+Backing up 'before6.rules' to '/etc/ufw/before6.rules.20260730_222031'
+Backing up 'after6.rules' to '/etc/ufw/after6.rules.20260730_222031'
+
+Default incoming policy changed to 'deny'
+(be sure to update your rules accordingly)
+Default outgoing policy changed to 'allow'
+(be sure to update your rules accordingly)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated
+Rules updated (v6)
+Firewall is active and enabled on system startup
+[ OK ] Firewall configured successfully.
+[INFO] === Phase 6: Post-Provisioning Verification ===
+[ OK ] Account exists: kk-api
+[ OK ] Account exists: kk-payments
+[ OK ] Account exists: kk-logs
+[ OK ] Directory exists: /opt/kijanikiosk/api
+[ OK ] Directory exists: /opt/kijanikiosk/payments
+[ OK ] Directory exists: /opt/kijanikiosk/logs
+[ OK ] Directory exists: /opt/kijanikiosk/config
+[ OK ] Directory exists: /opt/kijanikiosk/scripts
+[ OK ] Directory exists: /opt/kijanikiosk/shared
+[ OK ] Directory exists: /opt/kijanikiosk/shared/logs
+[ OK ] No SUID files found in /opt/kijanikiosk
+[ OK ] nginx is held
+[ OK ] nodejs is held
+[ OK ] kk-api.service is enabled
+[ OK ] All verification checks passed.
+[INFO] === Final Verification ===
+[ OK ] PASS: Package held: nginx (1.24.0-2ubuntu7.13)
+[ OK ] PASS: Package held: nodejs (18.19.1+dfsg-6ubuntu5)
+[ OK ] PASS: Account exists: kk-api
+[ OK ] PASS: Account exists: kk-payments
+[ OK ] PASS: Account exists: kk-logs
+[ OK ] PASS: Directory exists: /opt/kijanikiosk/api
+[ OK ] PASS: Directory exists: /opt/kijanikiosk/payments
+[ OK ] PASS: Directory exists: /opt/kijanikiosk/config
+[ OK ] PASS: Directory exists: /opt/kijanikiosk/shared/logs
+[ OK ] PASS: Directory exists: /opt/kijanikiosk/scripts
+[ OK ] PASS: Directory exists: /opt/kijanikiosk/health
+[ OK ] PASS: api.env readable by kk-api
+[ OK ] PASS: payments-api.env readable by kk-payments
+[ OK ] PASS: No SUID binaries under /opt/kijanikiosk
+[ OK ] PASS: kk-api.service is enabled
+[ OK ] PASS: kk-payments.service is enabled
+[ OK ] PASS: kk-logs.service is enabled
+[ OK ] PASS: Firewall — SSH (22/tcp) allowed
+[ OK ] PASS: Firewall — HTTP (80/tcp) allowed
+[ OK ] PASS: Firewall — 3001/tcp allowed from 10.0.1.0/24
+[ OK ] PASS: Firewall — 3001/tcp external deny present
+[ OK ] PASS: Firewall — all rules have comments
+[ OK ] Persistent journal directory exists
+[ OK ] Logrotate configuration exists
+[ OK ] Logrotate configuration validated
+[ OK ] Health report exists
+[ OK ] Health report contains API status
+[ OK ] Health report contains Payments status
+[INFO] FAIL: Health report ownership incorrect
