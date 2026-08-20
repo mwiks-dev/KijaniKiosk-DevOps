@@ -1,0 +1,7 @@
+| Tool               | IaC Category                  |
+| ------------------ | ----------------------------- |
+| **Ansible**        | **Configuration Management**  |
+| **CloudFormation** | **Cloud-Native/Infrastructure Provisioning**(AWS-only) |
+| **Puppet**         | **Configuration Management**  |
+| **Kubernetes**     | **Container Orchestration**   |
+| **Terraform**      | **Multi-Cloud Provisioning**  |
