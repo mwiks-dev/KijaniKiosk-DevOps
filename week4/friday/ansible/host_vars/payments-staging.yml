@@ -1,0 +1,4 @@
+service_name: kk-api
+service_port: 3000
+service_dir: "{{ base_dir }}/{{ service_name | replace('kk-', '') }}"
+extra_hardening: true

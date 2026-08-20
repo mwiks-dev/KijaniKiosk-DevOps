@@ -1,0 +1,25 @@
+# templates/app.service.j2
+[Unit]
+Description=KijaniKiosk {{ service_name }} Service
+After=network.target
+{% if service_name == "kk-payments" %}
+After=kk-api.service
+Wants=kk-api.service
+{% endif %}
+
+[Service]
+Type=simple
+User=kijanikiosk
+Group={{ service_group }}
+WorkingDirectory={{ base_dir }}/{{ service_name | replace('kk-', '') }}
+ExecStart={{ base_dir }}/{{ service_name | replace('kk-', '') }}/server --port {{ service_port }}
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={{ base_dir }}/{{ service_name | replace('kk-', '') }} {{ log_dir }}
+EnvironmentFile={{ base_dir }}/config/{{ service_name | replace('kk-', '') }}.env
+
+[Install]
+WantedBy=multi-user.target
