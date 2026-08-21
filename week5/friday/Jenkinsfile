@@ -44,8 +44,11 @@ pipeline {
         stage('Lint') {
             steps {
                 dir('week5/friday/kijanikiosk-payment') {
-                    sh 'npm ci'
-                    sh 'npm run lint'
+                    sh '''
+                        rm -rf node_modules
+                        npm ci
+                        npm run lint
+                    '''
                 }
             }
         }
@@ -54,14 +57,16 @@ pipeline {
             steps {
                 dir('week5/friday/kijanikiosk-payment') {
                     sh 'npm run build'
+
                     sh '''
                         if [ ! -d "$BUILD_DIR" ] || [ -z "$(ls -A "$BUILD_DIR")" ]; then
                             echo "Build output directory $BUILD_DIR not found or empty"
                             exit 1
                         fi
-                        echo "Build output file count: $(ls "$BUILD_DIR" | wc -l)"
                     '''
-                    stash name: 'build-output', includes: "${BUILD_DIR}/**"
+
+                    stash name: 'build-output',
+                        includes: 'week5/friday/kijanikiosk-payment/dist/**'
                 }
             }
         }
