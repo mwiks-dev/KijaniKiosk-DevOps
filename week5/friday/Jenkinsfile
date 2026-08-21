@@ -11,6 +11,7 @@ pipeline {
         NODE_ENV  = 'test'
         BUILD_DIR = 'dist'
         APP_NAME  = 'kijanikiosk-payment'
+        GIT_SHORT = "${env.GIT_COMMIT.take(7)}"
         NEXUS_URL = 'http://13.245.143.159:8081/repository/npm-kijanikiosk'
     }
 
@@ -21,16 +22,6 @@ pipeline {
     }
 
     stages {
-        stage('Prepare Environment') {
-            steps {
-                sh '''
-                    apk add --no-cache git
-                    git --version
-                    node --version
-                    npm --version
-                '''
-            }
-        }
 
         stage('Initialize') {
             steps {
@@ -38,11 +29,6 @@ pipeline {
                     script {
                         env.PKG_VERSION = sh(
                             script: "node -p \"require('./package.json').version\"",
-                            returnStdout: true
-                        ).trim()
-
-                        env.GIT_SHORT = sh(
-                            script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
 
