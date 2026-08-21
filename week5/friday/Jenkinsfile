@@ -46,8 +46,7 @@ pipeline {
                             unstash 'build-output'
                             sh 'npm test'
                                 set -e
-                                npm test -- --reporter-junit --reporter-options output-test-results/junit.xml
-                            '''
+                                npm test --reporter-junit --reporter-options output-test-results/junit.xml
                         }
                         post {
                             always {
