@@ -1,0 +1,110 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:18-alpine'   // pinned exact version, never 'latest'
+            args '-v /tmp:/tmp'
+        }
+    }
+        environment {
+        NODE_ENV          = 'test'
+        BUILD_DIR         = 'dist'                    // confirm this matches your project's actual output dir
+        APP_NAME          = 'kijanikiosk-payments'
+        PKG_VERSION       = sh(script: "node -p \"require('./package.json').version\"",
+                                returnStdout: true).trim()
+        GIT_SHORT         = sh(script: 'git rev-parse --short HEAD',
+                                returnStdout: true).trim()
+        ARTIFACT_VERSION  = "${PKG_VERSION}-${GIT_SHORT}"
+        NEXUS_URL = "http://13.245.143.159:8081/repository/npm-kijanikiosk"
+    }
+        options {
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
+        stages {
+            stage('Lint') {
+                steps {
+                    sh 'npm run lint'   // or your project's actual lint command
+                }
+            }
+            stage('Build') {
+                steps {
+                    sh 'npm ci'
+                    sh 'npm run build'
+                    sh '''
+                        set -e
+                        test -d "${BUILD_DIR}" || { echo "ERROR: build directory not found"; exit 1; }
+                        echo "Build output: $(ls ${BUILD_DIR} | wc -l) files"
+                    '''
+                    stash name: 'build-output', includes: 'dist/**,package.json,package-lock.json'
+                }
+            }
+            stage('Verify') {
+                parallel {
+                    stage('Test') {
+                        steps {
+                            unstash 'build-output'
+                            sh '''
+                                set -e
+                                npm test -- --reporter-junit --reporter-options output-test-results/junit.xml
+                            '''
+                        }
+                        post {
+                            always {
+                                junit allowEmptyResults: true, testResults: 'test-results/*.xml'
+                            }
+                        }
+                    }
+                    stage('Security Audit') {
+                        steps {
+                            unstash 'build-output'
+                            sh 'npm audit --audit-level=high'
+                        }
+                    }
+                }
+            }
+            stage('Archive') {
+                steps {
+                    unstash 'build-output'
+                    archiveArtifacts artifacts: 'dist/**', fingerprint: true, onlyIfSuccessful: true
+                }
+            }
+            stage('Publish') {
+                steps {
+                    unstash 'build-output'
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-credentials',
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
+                    )]) {
+                        sh '''
+                            set -e
+                            trap "rm -f .npmrc" EXIT
+                            NEXUS_TOKEN=$(echo -n "${NEXUS_USER}:${NEXUS_PASS}" | base64)
+                            cat > .npmrc <<NPMRC
+                            registry=${NEXUS_URL}
+                            //<vm-ip>:8081/repository/npm-kijanikiosk/:_authToken=${NEXUS_TOKEN}
+                            NPMRC
+                            npm version "${ARTIFACT_VERSION}" --no-git-tag-version --allow-same-version
+                            npm publish --registry "${NEXUS_URL}"
+                        '''
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Pipeline succeeded: ${APP_NAME} version ${ARTIFACT_VERSION} published to ${NEXUS_URL}"
+                }
+                failure {
+                    echo "Pipeline FAILED: ${APP_NAME} build ${BUILD_NUMBER} - check logs at ${BUILD_URL}"
+                }
+                changed {
+                    // Fires only on a status transition (green->red or red->green) — prevents alert fatigue
+                    echo "Build status changed to ${currentBuild.currentResult} - ${JOB_NAME} #${BUILD_NUMBER}"
+                }
+                always {
+                    cleanWs()
+                }
+            }
+        }
