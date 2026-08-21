@@ -44,14 +44,11 @@ pipeline {
                     stage('Test') {
                         steps {
                             unstash 'build-output'
-                            sh 'npm test'
+
+                            sh '''
                                 set -e
-                                npm test --reporter-junit --reporter-options output-test-results/junit.xml
-                        }
-                        post {
-                            always {
-                                junit allowEmptyResults: true, testResults: 'test-results/*.xml'
-                            }
+                                npm test
+                            '''
                         }
                     }
                     stage('Security Audit') {
