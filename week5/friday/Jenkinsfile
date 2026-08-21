@@ -9,7 +9,7 @@ pipeline {
         NODE_ENV          = 'test'
         BUILD_DIR         = 'dist'                    // confirm this matches your project's actual output dir
         APP_NAME          = 'kijanikiosk-payments'
-        PKG_VERSION       = sh(script: "node -p \"require('./package.json').version\"",
+        PKG_VERSION       = sh(script: "node -p \"require('.kijanikiosk-payment/package.json').version\"",
                                 returnStdout: true).trim()
         GIT_SHORT         = sh(script: 'git rev-parse --short HEAD',
                                 returnStdout: true).trim()
@@ -44,7 +44,7 @@ pipeline {
                     stage('Test') {
                         steps {
                             unstash 'build-output'
-                            sh '''
+                            sh 'npm test'
                                 set -e
                                 npm test -- --reporter-junit --reporter-options output-test-results/junit.xml
                             '''
