@@ -125,35 +125,39 @@ pipeline {
 
         stage('Publish') {
             steps {
-                dir('week5/friday/kijanikiosk-payment') {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'nexus-credentials',
-                            usernameVariable: 'NEXUS_USER',
-                            passwordVariable: 'NEXUS_PASS'
-                        )
-                    ]) {
-                        sh '''
-                            set -e
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-credentials',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+                    sh '''
+                        set -e
 
-                            trap "rm -f .npmrc" EXIT
+                        trap 'rm -f .npmrc' EXIT
 
-                            NEXUS_TOKEN=$(printf "%s:%s" "$NEXUS_USER" "$NEXUS_PASS" | base64 | tr -d '\\n')
-                            NEXUS_HOST=$(echo "$NEXUS_URL" | sed -E 's#^https?://##')
+                        NEXUS_HOST=$(echo "$NEXUS_URL" | sed -E 's#^https?://##')
 
-                            cat > .npmrc <<EOF
-registry=$NEXUS_URL/
-//$NEXUS_HOST/:_auth=$NEXUS_TOKEN
-always-auth=true
-EOF
+                        NEXUS_TOKEN=$(printf '%s:%s' "$NEXUS_USER" "$NEXUS_PASS" \
+                            | base64 | tr -d '\\n')
 
-                            npm version "$ARTIFACT_VERSION" \
-                                --no-git-tag-version \
-                                --allow-same-version
+                        cat > .npmrc <<EOF
+        registry=$NEXUS_URL/
+        //$NEXUS_HOST/:_auth=$NEXUS_TOKEN
+        always-auth=true
+        EOF
 
-                            npm publish
-                        '''
-                    }
+                        echo "Testing Nexus authentication..."
+
+                        npm whoami --registry="$NEXUS_URL"
+
+                        echo "Authentication successful."
+
+                        npm version "$ARTIFACT_VERSION" \
+                            --no-git-tag-version \
+                            --allow-same-version
+
+                        npm publish --registry="$NEXUS_URL"
+                    '''
                 }
             }
         }
