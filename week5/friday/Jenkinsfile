@@ -24,7 +24,7 @@ pipeline {
 
         stage('Initialize') {
             steps {
-                dir('kijanikiosk-payment') {
+                dir('week5/friday/kijanikiosk-payment') {
                     script {
                         env.PKG_VERSION = sh(
                             script: "node -p \"require('./package.json').version\"",
@@ -49,7 +49,7 @@ pipeline {
 
         stage('Lint') {
             steps {
-                dir('kijanikiosk-payment') {
+                dir('week5/friday/kijanikiosk-payment') {
                     sh 'npm ci'
                     sh 'npm run lint'
                 }
@@ -58,7 +58,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                dir('kijanikiosk-payment') {
+                dir('week5/friday/kijanikiosk-payment') {
                     sh 'npm run build'
 
                     sh '''
@@ -85,7 +85,7 @@ pipeline {
 
                 stage('Test') {
                     steps {
-                        dir('kijanikiosk-payment') {
+                        dir('week5/friday/kijanikiosk-payment') {
                             sh '''
                                 set -e
                                 npm test
@@ -105,7 +105,7 @@ pipeline {
 
                 stage('Security Audit') {
                     steps {
-                        dir('kijanikiosk-payment') {
+                        dir('week5/friday/kijanikiosk-payment') {
                             sh 'npm audit --audit-level=high'
                         }
                     }
@@ -128,7 +128,7 @@ pipeline {
         stage('Publish') {
             steps {
 
-                dir('kijanikiosk-payment') {
+                dir('week5/friday/kijanikiosk-payment') {
 
                     unstash 'build-output'
 
