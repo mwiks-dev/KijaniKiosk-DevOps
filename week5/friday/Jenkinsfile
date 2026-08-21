@@ -21,6 +21,16 @@ pipeline {
     }
 
     stages {
+        stage('Prepare Environment') {
+            steps {
+                sh '''
+                    apk add --no-cache git
+                    git --version
+                    node --version
+                    npm --version
+                '''
+            }
+        }
 
         stage('Initialize') {
             steps {
