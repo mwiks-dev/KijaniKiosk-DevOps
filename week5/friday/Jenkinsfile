@@ -1,107 +1,185 @@
 pipeline {
+
     agent {
         docker {
-            image 'node:18-alpine'   // pinned exact version, never 'latest'
+            image 'node:18-alpine'
             args '-v /tmp:/tmp'
         }
     }
-        environment {
-        NODE_ENV          = 'test'
-        BUILD_DIR         = 'dist'                    // confirm this matches your project's actual output dir
-        APP_NAME          = 'kijanikiosk-payments'
-        PKG_VERSION       = sh(script: "node -p \"require('.kijanikiosk-payment/package.json').version\"",
-                                returnStdout: true).trim()
-        GIT_SHORT         = sh(script: 'git rev-parse --short HEAD',
-                                returnStdout: true).trim()
-        ARTIFACT_VERSION  = "${PKG_VERSION}-${GIT_SHORT}"
-        NEXUS_URL = "http://13.245.143.159:8081/repository/npm-kijanikiosk"
+
+    environment {
+        NODE_ENV  = 'test'
+        BUILD_DIR = 'dist'
+        APP_NAME  = 'kijanikiosk-payment'
+        NEXUS_URL = 'http://13.245.143.159:8081/repository/npm-kijanikiosk'
     }
-        options {
+
+    options {
         timeout(time: 15, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
     }
-        stages {
-            stage('Lint') {
-                steps {
-                    sh 'npm run lint'   // or your project's actual lint command
+
+    stages {
+
+        stage('Initialize') {
+            steps {
+                dir('kijanikiosk-payment') {
+                    script {
+                        env.PKG_VERSION = sh(
+                            script: "node -p \"require('./package.json').version\"",
+                            returnStdout: true
+                        ).trim()
+
+                        env.GIT_SHORT = sh(
+                            script: 'git rev-parse --short HEAD',
+                            returnStdout: true
+                        ).trim()
+
+                        env.ARTIFACT_VERSION =
+                            "${env.PKG_VERSION}-${env.GIT_SHORT}"
+
+                        echo "Package version: ${env.PKG_VERSION}"
+                        echo "Git commit: ${env.GIT_SHORT}"
+                        echo "Artifact version: ${env.ARTIFACT_VERSION}"
+                    }
                 }
             }
-            stage('Build') {
-                steps {
+        }
+
+        stage('Lint') {
+            steps {
+                dir('kijanikiosk-payment') {
                     sh 'npm ci'
+                    sh 'npm run lint'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('kijanikiosk-payment') {
                     sh 'npm run build'
+
                     sh '''
                         set -e
-                        test -d "${BUILD_DIR}" || { echo "ERROR: build directory not found"; exit 1; }
-                        echo "Build output: $(ls ${BUILD_DIR} | wc -l) files"
+
+                        test -d "${BUILD_DIR}" || {
+                            echo "ERROR: build directory not found"
+                            exit 1
+                        }
+
+                        echo "Build output:"
+                        find "${BUILD_DIR}" -type f
                     '''
-                    stash name: 'build-output', includes: 'dist/**,package.json,package-lock.json'
+
+                    stash name: 'build-output',
+                          includes: 'kijanikiosk-payment/dist/**,kijanikiosk-payment/package.json,kijanikiosk-payment/package-lock.json'
                 }
             }
-            stage('Verify') {
-                parallel {
-                    stage('Test') {
-                        steps {
-                            unstash 'build-output'
+        }
 
+        stage('Verify') {
+
+            parallel {
+
+                stage('Test') {
+                    steps {
+                        dir('kijanikiosk-payment') {
                             sh '''
                                 set -e
                                 npm test
                             '''
                         }
                     }
-                    stage('Security Audit') {
-                        steps {
-                            unstash 'build-output'
+
+                    post {
+                        always {
+                            junit(
+                                allowEmptyResults: true,
+                                testResults: 'kijanikiosk-payment/test-results/*.xml'
+                            )
+                        }
+                    }
+                }
+
+                stage('Security Audit') {
+                    steps {
+                        dir('kijanikiosk-payment') {
                             sh 'npm audit --audit-level=high'
                         }
                     }
                 }
             }
-            stage('Archive') {
-                steps {
-                    unstash 'build-output'
-                    archiveArtifacts artifacts: 'dist/**', fingerprint: true, onlyIfSuccessful: true
-                }
+        }
+
+        stage('Archive') {
+            steps {
+                unstash 'build-output'
+
+                archiveArtifacts(
+                    artifacts: 'kijanikiosk-payment/dist/**',
+                    fingerprint: true,
+                    onlyIfSuccessful: true
+                )
             }
-            stage('Publish') {
-                steps {
+        }
+
+        stage('Publish') {
+            steps {
+
+                dir('kijanikiosk-payment') {
+
                     unstash 'build-output'
-                    withCredentials([usernamePassword(
-                        credentialsId: 'nexus-credentials',
-                        usernameVariable: 'NEXUS_USER',
-                        passwordVariable: 'NEXUS_PASS'
-                    )]) {
+
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'nexus-credentials',
+                            usernameVariable: 'NEXUS_USER',
+                            passwordVariable: 'NEXUS_PASS'
+                        )
+                    ]) {
+
                         sh '''
                             set -e
-                            trap "rm -f .npmrc" EXIT
-                            NEXUS_TOKEN=$(echo -n "${NEXUS_USER}:${NEXUS_PASS}" | base64)
-                            cat > .npmrc <<NPMRC
-                            registry=${NEXUS_URL}
-                            //<vm-ip>:8081/repository/npm-kijanikiosk/:_authToken=${NEXUS_TOKEN}
-                            NPMRC
-                            npm version "${ARTIFACT_VERSION}" --no-git-tag-version --allow-same-version
-                            npm publish --registry "${NEXUS_URL}"
+
+                            trap 'rm -f .npmrc' EXIT
+
+                            NEXUS_TOKEN=$(printf '%s:%s' \
+                                "${NEXUS_USER}" \
+                                "${NEXUS_PASS}" | base64 | tr -d '\\n')
+
+                            cat > .npmrc <<EOF
+registry=${NEXUS_URL}
+//13.245.143.159:8081/repository/npm-kijanikiosk/:_authToken=${NEXUS_TOKEN}
+always-auth=true
+EOF
+
+                            npm version "${ARTIFACT_VERSION}" \
+                                --no-git-tag-version \
+                                --allow-same-version
+
+                            npm publish \
+                                --registry "${NEXUS_URL}"
                         '''
-                        }
                     }
                 }
             }
-            post {
-                success {
-                    echo "Pipeline succeeded: ${APP_NAME} version ${ARTIFACT_VERSION} published to ${NEXUS_URL}"
-                }
-                failure {
-                    echo "Pipeline FAILED: ${APP_NAME} build ${BUILD_NUMBER} - check logs at ${BUILD_URL}"
-
-                }
-                changed {
-                    // Fires only on a status transition (green->red or red->green) — prevents alert fatigue
-                    echo "Build status changed to ${currentBuild.currentResult} - ${JOB_NAME} #${BUILD_NUMBER}"
-                }
-                always {
-                    cleanWs()
-                }
-            }
         }
+    }
+
+    post {
+
+        success {
+            echo "Pipeline succeeded: ${APP_NAME} version ${ARTIFACT_VERSION} published to ${NEXUS_URL}"
+        }
+
+        failure {
+            echo "Pipeline FAILED: ${APP_NAME} build ${BUILD_NUMBER} - check logs at ${BUILD_URL}"
+        }
+
+        changed {
+            echo "Build status changed to ${currentBuild.currentResult} - ${JOB_NAME} #${BUILD_NUMBER}"
+        }
+    }
+}
