@@ -10,14 +10,6 @@ pipeline {
         NODE_ENV  = 'test'
         BUILD_DIR = 'dist'
         APP_NAME  = 'kijanikiosk-payments'
-
-        PKG_VERSION      = sh(script: "node -p \"require('./week5/friday/kijanikiosk-payment/package.json').version\"", returnStdout: true).trim()
-        GIT_SHORT        = sh(script: "apk add --no-cache git >/dev/null 2>&1; git rev-parse --short HEAD", returnStdout: true).trim()
-        ARTIFACT_VERSION = "${PKG_VERSION}-${GIT_SHORT}"
-        // Agent runs with --network=host, so the container shares the VM's
-        // network namespace. Use 127.0.0.1 (not localhost) because Node 18
-        // resolves "localhost" to the IPv6 loopback (::1) first, and Docker's
-        // published port only binds the IPv4 wildcard, causing ECONNREFUSED.
         NEXUS_URL        = 'http://13.245.143.159:8081/repository/npm-kijanikiosk'
     }
 
@@ -28,6 +20,27 @@ pipeline {
     }
 
     stages {
+        stage('Initialize') {
+            steps {
+                dir('week5/friday/kijanikiosk-payment') {
+                    script {
+                        env.PKG_VERSION = sh(
+                            script: "node -p \"require('./package.json').version\"",
+                            returnStdout: true
+                        ).trim()
+
+                        env.GIT_SHORT = env.GIT_COMMIT.take(7)
+
+                        env.ARTIFACT_VERSION =
+                            "${env.PKG_VERSION}-${env.GIT_SHORT}"
+
+                        echo "Package version: ${env.PKG_VERSION}"
+                        echo "Git commit: ${env.GIT_SHORT}"
+                        echo "Artifact version: ${env.ARTIFACT_VERSION}"
+                    }
+                }
+            }
+        }
         stage('Lint') {
             steps {
                 retry(2) {
