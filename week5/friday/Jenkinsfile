@@ -46,8 +46,10 @@ pipeline {
         stage('Lint') {
             steps {
                 dir('week5/friday/kijanikiosk-payment') {
+                    sh 'rm -rf node modules'
                     sh 'npm ci'
                     sh 'npm run lint'
+
                 }
             }
         }
