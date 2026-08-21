@@ -10,7 +10,7 @@ pipeline {
         NODE_ENV        = 'test'
         BUILD_DIR       = 'dist'
         APP_NAME        = 'kijanikiosk-payments'
-        NEXUS_URL       = 'http://13.245.143.159:8081/repository/npm-kijanikiosk'
+        NEXUS_URL = 'http://127.0.0.1:8081/repository/npm-kijanikiosk'
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm"
     }
 
