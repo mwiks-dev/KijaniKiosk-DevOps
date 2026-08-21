@@ -1,18 +1,24 @@
 pipeline {
-
     agent {
         docker {
             image 'node:18-alpine'
-            args '-v /tmp:/tmp'
+            args  '-v /tmp:/tmp --network=host'
         }
     }
 
     environment {
         NODE_ENV  = 'test'
         BUILD_DIR = 'dist'
-        APP_NAME  = 'kijanikiosk-payment'
-        GIT_SHORT = "${env.GIT_COMMIT.take(7)}"
-        NEXUS_URL = 'http://13.245.143.159:8081/repository/npm-kijanikiosk'
+        APP_NAME  = 'kijanikiosk-payments'
+
+        PKG_VERSION      = sh(script: "node -p \"require('week5/friday/kijanikiosk-payment/package.json').version\"", returnStdout: true).trim()
+        GIT_SHORT        = sh(script: "apk add --no-cache git >/dev/null 2>&1; git rev-parse --short HEAD", returnStdout: true).trim()
+        ARTIFACT_VERSION = "${PKG_VERSION}-${GIT_SHORT}"
+        // Agent runs with --network=host, so the container shares the VM's
+        // network namespace. Use 127.0.0.1 (not localhost) because Node 18
+        // resolves "localhost" to the IPv6 loopback (::1) first, and Docker's
+        // published port only binds the IPv4 wildcard, causing ECONNREFUSED.
+        NEXUS_URL        = 'http://13.245.143.159:8081/repository/npm-kijanikiosk'
     }
 
     options {
@@ -22,90 +28,48 @@ pipeline {
     }
 
     stages {
-
-        stage('Initialize') {
-            steps {
-                dir('week5/friday/kijanikiosk-payment') {
-                    script {
-                        env.PKG_VERSION = sh(
-                            script: "node -p \"require('./package.json').version\"",
-                            returnStdout: true
-                        ).trim()
-
-                        env.ARTIFACT_VERSION =
-                            "${env.PKG_VERSION}-${env.GIT_SHORT}"
-
-                        echo "Package version: ${env.PKG_VERSION}"
-                        echo "Git commit: ${env.GIT_SHORT}"
-                        echo "Artifact version: ${env.ARTIFACT_VERSION}"
-                    }
-                }
-            }
-        }
-
         stage('Lint') {
             steps {
-                dir('week5/friday/kijanikiosk-payment') {
-                    sh 'rm -rf node modules'
+                retry(2) {
                     sh 'npm ci'
-                    sh 'npm run lint'
-
                 }
+                sh 'npm run lint'
             }
         }
 
         stage('Build') {
             steps {
-                dir('week5/friday/kijanikiosk-payment') {
-                    sh 'npm run build'
-
-                    sh '''
-                        set -e
-
-                        test -d "${BUILD_DIR}" || {
-                            echo "ERROR: build directory not found"
-                            exit 1
-                        }
-
-                        echo "Build output:"
-                        find "${BUILD_DIR}" -type f
-                    '''
-
-                    stash name: 'build-output',
-                          includes: 'kijanikiosk-payment/dist/**,kijanikiosk-payment/package.json,kijanikiosk-payment/package-lock.json'
-                }
+                sh 'npm run build'
+                sh '''
+                    if [ ! -d "$BUILD_DIR" ] || [ -z "$(ls -A "$BUILD_DIR")" ]; then
+                        echo "Build output directory $BUILD_DIR not found or empty"
+                        exit 1
+                    fi
+                    echo "Build output file count: $(ls "$BUILD_DIR" | wc -l)"
+                '''
+                stash name: 'build-output', includes: "${BUILD_DIR}/**"
             }
         }
 
         stage('Verify') {
-
             parallel {
-
                 stage('Test') {
                     steps {
-                        dir('week5/friday/kijanikiosk-payment') {
-                            sh '''
-                                set -e
-                                npm test
-                            '''
-                        }
+                        unstash 'build-output'
+                        sh '''
+                            set -e
+                            npm test
+                        '''
                     }
-
                     post {
                         always {
-                            junit(
-                                allowEmptyResults: true,
-                                testResults: 'kijanikiosk-payment/test-results/*.xml'
-                            )
+                            junit allowEmptyResults: true, testResults: 'test-results/*.xml'
                         }
                     }
                 }
-
                 stage('Security Audit') {
                     steps {
-                        dir('week5/friday/kijanikiosk-payment') {
-                            sh 'npm audit --audit-level=high'
-                        }
+                        sh 'npm audit --audit-level=high'
                     }
                 }
             }
@@ -113,71 +77,53 @@ pipeline {
 
         stage('Archive') {
             steps {
-                unstash 'build-output'
-
-                archiveArtifacts(
-                    artifacts: 'kijanikiosk-payment/dist/**',
-                    fingerprint: true,
-                    onlyIfSuccessful: true
-                )
+                archiveArtifacts artifacts: "${BUILD_DIR}/**",
+                                 fingerprint: true,
+                                 onlyIfSuccessful: true
             }
         }
 
         stage('Publish') {
             steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-credentials',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+                    sh '''
+                        set -e
+                        trap "rm -f .npmrc" EXIT
 
-                dir('week5/friday/kijanikiosk-payment') {
+                        NEXUS_TOKEN=$(printf "%s:%s" "$NEXUS_USER" "$NEXUS_PASS" | base64 | tr -d '\\n')
+                        NEXUS_HOST=$(echo "$NEXUS_URL" | sed -E 's#^https?://##')
 
-                    unstash 'build-output'
-
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'nexus-credentials',
-                            usernameVariable: 'NEXUS_USER',
-                            passwordVariable: 'NEXUS_PASS'
-                        )
-                    ]) {
-
-                        sh '''
-                            set -e
-
-                            trap 'rm -f .npmrc' EXIT
-
-                            NEXUS_TOKEN=$(printf '%s:%s' \
-                                "${NEXUS_USER}" \
-                                "${NEXUS_PASS}" | base64 | tr -d '\\n')
-
-                            cat > .npmrc <<EOF
-registry=${NEXUS_URL}
-//13.245.143.159:8081/repository/npm-kijanikiosk/:_authToken=${NEXUS_TOKEN}
+                        cat > .npmrc <<EOF
+registry=$NEXUS_URL/
+//$NEXUS_HOST/:_auth=$NEXUS_TOKEN
 always-auth=true
 EOF
 
-                            npm version "${ARTIFACT_VERSION}" \
-                                --no-git-tag-version \
-                                --allow-same-version
-
-                            npm publish \
-                                --registry "${NEXUS_URL}"
-                        '''
-                    }
+                        npm version "$ARTIFACT_VERSION" --no-git-tag-version --allow-same-version
+                        npm publish
+                    '''
                 }
             }
         }
     }
 
     post {
-
         success {
-            echo "Pipeline succeeded: ${APP_NAME} version ${ARTIFACT_VERSION} published to ${NEXUS_URL}"
+            echo "Published ${APP_NAME} version ${ARTIFACT_VERSION} to Nexus"
+            echo "Artifact URL: ${NEXUS_URL}/kijanikiosk-payments/-/kijanikiosk-payments-${ARTIFACT_VERSION}.tgz"
         }
-
         failure {
-            echo "Pipeline FAILED: ${APP_NAME} build ${BUILD_NUMBER} - check logs at ${BUILD_URL}"
+            echo "Pipeline FAILED at build ${BUILD_NUMBER} - check logs at ${BUILD_URL}"
         }
-
         changed {
             echo "Build status changed to ${currentBuild.currentResult} - ${JOB_NAME} #${BUILD_NUMBER}"
+        }
+        always {
+            cleanWs()
         }
     }
 }
