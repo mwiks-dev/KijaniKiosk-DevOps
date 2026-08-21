@@ -11,7 +11,7 @@ pipeline {
         BUILD_DIR = 'dist'
         APP_NAME  = 'kijanikiosk-payments'
 
-        PKG_VERSION      = sh(script: "node -p \"require('week5/friday/kijanikiosk-payment/package.json').version\"", returnStdout: true).trim()
+        PKG_VERSION      = sh(script: "node -p \"require('./week5/friday/kijanikiosk-payment/package.json').version\"", returnStdout: true).trim()
         GIT_SHORT        = sh(script: "apk add --no-cache git >/dev/null 2>&1; git rev-parse --short HEAD", returnStdout: true).trim()
         ARTIFACT_VERSION = "${PKG_VERSION}-${GIT_SHORT}"
         // Agent runs with --network=host, so the container shares the VM's
