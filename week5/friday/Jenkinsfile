@@ -98,6 +98,7 @@ pipeline {
                 }
                 failure {
                     echo "Pipeline FAILED: ${APP_NAME} build ${BUILD_NUMBER} - check logs at ${BUILD_URL}"
+
                 }
                 changed {
                     // Fires only on a status transition (green->red or red->green) — prevents alert fatigue
