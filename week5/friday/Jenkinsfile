@@ -25,7 +25,7 @@ pipeline {
                 dir('week5/friday/kijanikiosk-payment') {
                     script {
                         env.PKG_VERSION = sh(
-                            script: "node -p \"require('./package.json').version\"",
+                            script: "node -p \"require('./week5/friday/kijanikiosk-payment/package.json').version\"",
                             returnStdout: true
                         ).trim()
 
@@ -43,24 +43,26 @@ pipeline {
         }
         stage('Lint') {
             steps {
-                retry(2) {
+                dir('week5/friday/kijanikiosk-payment') {
                     sh 'npm ci'
+                    sh 'npm run lint'
                 }
-                sh 'npm run lint'
             }
         }
 
         stage('Build') {
             steps {
-                sh 'npm run build'
-                sh '''
-                    if [ ! -d "$BUILD_DIR" ] || [ -z "$(ls -A "$BUILD_DIR")" ]; then
-                        echo "Build output directory $BUILD_DIR not found or empty"
-                        exit 1
-                    fi
-                    echo "Build output file count: $(ls "$BUILD_DIR" | wc -l)"
-                '''
-                stash name: 'build-output', includes: "${BUILD_DIR}/**"
+                dir('week5/friday/kijanikiosk-payment') {
+                    sh 'npm run build'
+                    sh '''
+                        if [ ! -d "$BUILD_DIR" ] || [ -z "$(ls -A "$BUILD_DIR")" ]; then
+                            echo "Build output directory $BUILD_DIR not found or empty"
+                            exit 1
+                        fi
+                        echo "Build output file count: $(ls "$BUILD_DIR" | wc -l)"
+                    '''
+                    stash name: 'build-output', includes: "${BUILD_DIR}/**"
+                }
             }
         }
 
