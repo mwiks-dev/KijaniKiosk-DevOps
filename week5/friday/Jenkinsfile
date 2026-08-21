@@ -68,7 +68,7 @@ pipeline {
                     '''
 
                     stash name: 'build-output',
-                        includes: 'week5/friday/kijanikiosk-payment/dist/**'
+                        includes: 'dist/**'
                 }
             }
         }
@@ -77,21 +77,22 @@ pipeline {
             parallel {
                 stage('Test') {
                     steps {
-                        unstash 'build-output'
-                        sh '''
-                            set -e
-                            npm test
-                        '''
-                    }
-                    post {
-                        always {
-                            junit allowEmptyResults: true, testResults: 'test-results/*.xml'
-                        }
+                        dir('week5/friday/kijanikiosk-payment') {
+                            unstash 'build-output'
+                            sh '''
+                                set -e
+                                npm test
+                            '''
+                        post {
+                            always {
+                                junit allowEmptyResults: true, testResults: 'test-results/*.xml'
                     }
                 }
-                stage('Security Audit') {
-                    steps {
-                        sh 'npm audit --audit-level=high'
+            }
+        }
+        stage('Security Audit') {
+            steps {
+                sh 'npm audit --audit-level=high'
                     }
                 }
             }
