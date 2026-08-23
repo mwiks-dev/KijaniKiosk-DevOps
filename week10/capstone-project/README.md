@@ -263,6 +263,29 @@ kk-analytics
 | `kk-notifier`  | Prepare and deliver processed receipt events             |
 | `kk-analytics` | Aggregate receipt events and produce analytics summaries |
 
+### Phase 5 — Kubernetes `kk-payments` Integration**
+
+Phase 5 connects the Kubernetes `kk-payments` service to the staging
+serverless receipt workflow.
+
+The purpose of this phase is to establish the integration seam between
+the Kubernetes payment service and the serverless receipt-processing
+architecture.
+
+The target flow is:
+
+```text
+kk-payments
+     ↓
+POST /payments
+     ↓
+Receipt event generated
+     ↓
+S3 staging receipt bucket
+     ↓
+Serverless receipt workflow
+```
+
 
 ## 2. Problem Statement
 
@@ -464,17 +487,17 @@ cd <project-directory>
 
 ## 10. Environment Configuration
 
-Before deploying, configure the AWS credentials required by the project.
+The `kk-payments` service uses environment variables for runtime configuration.
 
-Verify the active AWS identity:
+For the staging environment, the Kubernetes `kk-payments-config` ConfigMap provides:
 
-```bash
-aws sts get-caller-identity
+```text
+APP_PORT=3001
+LOG_LEVEL=info
+MAX_CONNECTIONS=10
+NODE_ENV=staging
+RECEIPTS_BUCKET=kijanikiosk-receipts-staging
 ```
-
-The Serverless Framework should use the configured AWS credentials when deploying the application.
-
-Do not commit credentials, access keys, passwords, tokens, or secrets to Git.
 
 ## 11. Local Development
 
@@ -844,7 +867,7 @@ Verify the deployment has been removed using the AWS console or AWS CLI.
 - Documented duplicate-event handling.
 - Added verification requirements for analytics and idempotency behaviour.
 
-### Phase 4**
+### Phase 4
 - Added the four-function event-chain architecture:
   `kk-receipts → kk-processor → kk-notifier → S3 output bucket → kk-analytics`.
 - Defined explicit event boundaries for each serverless function, including triggers, inputs, processing responsibilities, outputs, destinations, permissions, errors, and logging requirements.
@@ -858,3 +881,25 @@ Verify the deployment has been removed using the AWS console or AWS CLI.
 - Defined the planned S3 `ObjectCreated` event that will trigger `kk-analytics`.
 - Defined Phase 4 integration test data using receipts `R001 = 500`, `R002 = 1000`, and `R003 = 250`, with an expected total of `1750` across `3` receipts.
 - Documented machine-readable structured logging requirements across the serverless functions.
+
+### Phase 5
+- Added the Kubernetes ``kk-payments`` integration with the serverless receipt workflow.
+- Configured ``kk-payments`` to use the ``RECEIPTS_BUCKET`` environment variable instead of hard-coding the receipt bucket.
+- Configured the staging receipt bucket as ``kijanikiosk-receipts-staging``.
+- Maintained separate environment-specific configuration for staging and production.
+- Added the ``POST /payments`` endpoint to allow an actual payment request to generate a receipt event.
+- Added validation for required payment fields, including ``receiptId`` and ``amount``.
+- Added generation of ``eventId``, ``correlationId``, ``receiptId``, and ``timestamp`` for generated receipt events.
+- Added the AWS SDK for JavaScript S3 client to support receipt storage.
+- Added S3 ``PutObject`` functionality to store generated receipt events in the configured staging bucket.
+- Defined the receipt object naming convention as ``receipts/<receiptId>.json``.
+- Established the Kubernetes-to-S3 integration seam:
+  ``kk-payments → POST /payments → receipt event → S3 staging receipt bucket``.
+- Added structured ``kk-payments`` logging containing fields including ``function``, ``eventType``, ``eventId``, ``correlationId``, ``receiptId``, ``amount``, ``bucket``, ``objectKey``, and ``timestamp``.
+- Added ``/health`` verification for the ``kk-payments`` service.
+- Verified Kubernetes deployment, pods, services, and ConfigMap configuration.
+- Established actual payment generation as the integration test mechanism rather than manually uploading receipt objects to S3.
+- Documented commands for generating a payment and verifying the resulting receipt object in the staging bucket.
+- Documented the requirement that AWS credentials and permissions must be provided through the runtime environment and must not be hard-coded in the repository.
+- Documented the next integration step of connecting the S3 ``ObjectCreated`` event to the serverless receipt-processing chain.
+- Updated the AI governance documentation to record AI assistance, human review, verification, and configuration decisions for the Kubernetes-to-S3 integration.

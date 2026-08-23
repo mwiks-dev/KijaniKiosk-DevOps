@@ -5,7 +5,7 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: nodejs18.x
-  region: af-south-1
+  region: ${opt:region, 'af-south-1'}
   stage: ${opt:stage, 'staging'}
 
 functions:
@@ -25,13 +25,27 @@ functions:
 resources:
   Resources:
 
-    OutputBucket:
+    ReceiptsBucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: kijanikiosk-capstone-${self:provider.stage}
+        BucketName: kijanikiosk-receipts-${self:provider.stage}
 
-outputs:
+    ReceiptsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref ReceiptsBucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: s3.amazonaws.com
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub '${ReceiptsBucket.Arn}/*'
+  Outputs:
 
-  OutputBucketName:
-    Value:
-      Ref: OutputBucket
+    ReceiptsBucketName:
+      Description: Receipt bucket used by the KijaniKiosk receipt workflow
+      Value: !Ref ReceiptsBucket
