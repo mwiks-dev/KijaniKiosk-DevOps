@@ -1,0 +1,22 @@
+{
+  "name": "capstone-project",
+  "version": "1.0.0",
+  "description": "The capstone repository was initialized with separate directories for serverless handlers, Kubernetes configuration, testing, scripts, documentation, and evidence.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "jest",
+    "test:integration": "jest tests/integration"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "jest": "^30.4.2",
+    "serverles": "^3.27.1"
+  }
+}
