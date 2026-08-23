@@ -1,0 +1,2 @@
+NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+kk-payments   ClusterIP   10.103.172.166   <none>        3001/TCP   39m

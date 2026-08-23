@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: kk-payments
-          image: kijani/kk-payments:v1.1.0
+          image: kijani/kk-payments:v9.9.9-bad
           imagePullPolicy: IfNotPresent
 
           ports:

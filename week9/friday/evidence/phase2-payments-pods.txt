@@ -1,0 +1,4 @@
+NAME                          READY   STATUS    RESTARTS   AGE
+kk-payments-5ccbbd865-769gs   1/1     Running   0          8m5s
+kk-payments-5ccbbd865-8mwfg   1/1     Running   0          7m52s
+kk-payments-5ccbbd865-bqn5m   1/1     Running   0          8m5s
