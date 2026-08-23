@@ -286,6 +286,50 @@ S3 staging receipt bucket
 Serverless receipt workflow
 ```
 
+### Phase 6 — Staging Deployment
+
+Phase 6 prepares the complete event-driven workflow for deployment into a dedicated staging environment.
+
+Separate staging resources were introduced to ensure that development and testing activities remain isolated from future production resources. A dedicated staging receipt bucket was created together with the Serverless Framework deployment bucket used during application deployment.
+
+Environment-specific configuration was introduced using Serverless Framework stages so that staging and production deployments can use different resource names without modifying application code.
+
+The staging deployment is intended to be performed using:
+
+```bash
+serverless deploy --stage staging
+```
+
+Deployment verification is performed using:
+
+```bash
+serverless info --stage staging
+```
+
+The staging architecture currently consists of:
+
+```text
+kk-payments
+      ↓
+kijanikiosk-receipts-staging
+      ↓
+kk-receipts
+      ↓
+kk-processor
+      ↓
+kk-notifier
+      ↓
+kijanikiosk-output-staging
+      ↓
+(Planned S3 ObjectCreated trigger)
+      ↓
+kk-analytics
+```
+
+The staging receipt bucket has been provisioned, and a separate output bucket has been created to support the final event-driven integration. The S3 event notification that invokes kk-analytics will be configured in the subsequent implementation phase.
+
+The use of separate staging resources prevents development and integration testing activities from affecting future production deployments.
+
 
 ## 2. Problem Statement
 
@@ -903,3 +947,14 @@ Verify the deployment has been removed using the AWS console or AWS CLI.
 - Documented the requirement that AWS credentials and permissions must be provided through the runtime environment and must not be hard-coded in the repository.
 - Documented the next integration step of connecting the S3 ``ObjectCreated`` event to the serverless receipt-processing chain.
 - Updated the AI governance documentation to record AI assistance, human review, verification, and configuration decisions for the Kubernetes-to-S3 integration.
+
+### Phase 6
+- Introduced a dedicated staging deployment environment using Serverless Framework stages.
+- Created the kijanikiosk-receipts-staging S3 bucket for receipt ingestion.
+- Created a dedicated staging output bucket for downstream serverless processing.
+- Verified the Serverless Framework deployment bucket created during staging deployment.
+- Configured environment-specific staging resource naming conventions.
+- Added deployment verification using serverless info --stage staging.
+- Confirmed separation between staging and future production resources.
+- Verified that the staging output bucket currently contains no S3 event notifications prior to connecting kk-analytics.
+- Prepared the staging environment for end-to-end event-driven integration and testing.

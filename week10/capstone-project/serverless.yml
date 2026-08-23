@@ -7,6 +7,14 @@ provider:
   runtime: nodejs18.x
   region: ${opt:region, 'af-south-1'}
   stage: ${opt:stage, 'staging'}
+  environment:
+    STAGE: ${sls:stage}
+    RECEIPTS_BUCKET: ${self:custom.receiptsBucket}
+    OUTPUT_BUCKET: ${self:custom.outputBucket}
+    
+custom:
+  receiptsBucket: kijanikiosk-receipts-${sls:stage}
+  outputBucket: kijanikiosk-output-${sls:stage}
 
 functions:
 
