@@ -32,6 +32,212 @@ and:
 npm run test:integration
 ```
 
+### Phase 3 — Build `kk-analytics`
+
+Phase 3 introduces the fourth serverless function required by Track B: `kk-analytics`.
+
+The responsibility of `kk-analytics` is to receive receipt events, validate the required receipt fields, aggregate receipt information, produce a structured analytics summary, and log the resulting summary.
+
+The processing flow is:
+
+```text
+Receive receipt event
+        ↓
+Validate required fields
+        ↓
+Aggregate
+        ↓
+Produce structured summary
+        ↓
+Log summary
+```
+
+The required analytics metrics are:
+
+* `receiptCount` — number of valid receipts processed.
+* `totalAmount` — sum of the receipt amounts.
+* `firstReceiptAt` — timestamp of the earliest receipt.
+* `lastReceiptAt` — timestamp of the latest receipt.
+
+The analytics function is implemented in:
+
+```text
+src/
+└── kk-analytics/
+    └── handler.js
+```
+
+The unit tests are implemented in:
+
+```text
+tests/
+└── unit/
+    └── kk-analytics.test.js
+```
+
+The `kk-analytics` implementation validates the following required receipt fields:
+
+```text
+receiptId
+amount
+timestamp
+```
+
+Invalid receipts are rejected rather than being included in the analytics calculation.
+
+For an empty receipt collection, the function produces:
+
+```json
+{
+  "receiptCount": 0,
+  "totalAmount": 0,
+  "firstReceiptAt": null,
+  "lastReceiptAt": null
+}
+```
+
+A successful analytics calculation produces a structured summary such as:
+
+```json
+{
+  "receiptCount": 2,
+  "totalAmount": 2500,
+  "firstReceiptAt": "2026-08-23T08:00:00.000Z",
+  "lastReceiptAt": "2026-08-23T09:00:00.000Z"
+}
+```
+
+### Phase 3.5 — Correlation and Event IDs
+
+Meaningful `kk-analytics` logs must contain consistent identifiers and metadata so that individual receipt events can be traced through the serverless workflow.
+
+The required log fields are:
+
+```text
+eventId
+correlationId
+receiptId
+function
+timestamp
+```
+
+Example structured log:
+
+```json
+{
+  "eventId": "E001",
+  "correlationId": "C001",
+  "receiptId": "RCP-001",
+  "function": "kk-analytics",
+  "timestamp": "2026-08-23T10:30:00.000Z",
+  "message": "Analytics summary generated",
+  "summary": {
+    "receiptCount": 1,
+    "totalAmount": 1500,
+    "firstReceiptAt": "2026-08-23T10:30:00.000Z",
+    "lastReceiptAt": "2026-08-23T10:30:00.000Z"
+  }
+}
+```
+
+The identifiers have the following purposes:
+
+* `eventId` uniquely identifies the individual event.
+* `correlationId` allows the same transaction or workflow to be traced across multiple services.
+* `receiptId` identifies the receipt being processed.
+* `function` identifies the Lambda function generating the log.
+* `timestamp` records when the log entry was generated.
+
+This structure will make the event flow easier to demonstrate and troubleshoot during the capstone presentation.
+
+### Phase 3.6 — Idempotency Strategy
+
+`kk-analytics` must have an explicit strategy for handling duplicate events.
+
+For example, if event `E001` arrives twice:
+
+```text
+E001
+ ↓
+kk-analytics
+ ↓
+Analytics summary generated
+
+E001
+ ↓
+kk-analytics
+ ↓
+Duplicate detected
+ ↓
+Existing result reused / event ignored
+```
+
+The capstone uses the `eventId` as the idempotency key.
+
+The intended rule is:
+
+```text
+Same eventId
+    ↓
+Already processed?
+    ├── YES → Do not aggregate again
+    └── NO  → Process and record eventId
+```
+
+This prevents a duplicated delivery of the same event from incorrectly increasing `receiptCount` or `totalAmount`.
+
+For the capstone implementation, idempotency does not require a large distributed state-management system. The important requirement is that the strategy is explicit, testable, and reflected in the application design.
+
+The expected behaviour is:
+
+```text
+First arrival of E001
+    → Process event
+    → Generate analytics
+    → Record E001 as processed
+
+Second arrival of E001
+    → Detect duplicate eventId
+    → Do not aggregate again
+```
+
+An integration test should eventually verify that sending the same event twice does not double-count the receipt.
+
+### Phase 3 Verification
+
+Run the complete unit test suite:
+
+```bash
+npm test
+```
+
+Run only the `kk-analytics` unit tests:
+
+```bash
+npx jest tests/unit/kk-analytics.test.js --verbose
+```
+
+The expected processing behaviour is:
+
+```text
+Receipt event
+     ↓
+Required-field validation
+     ↓
+Duplicate/idempotency check
+     ↓
+Aggregation
+     ↓
+receiptCount
+totalAmount
+firstReceiptAt
+lastReceiptAt
+     ↓
+Structured summary
+     ↓
+Structured log
+```
+
 ## 2. Problem Statement
 
 KijaniKiosk currently processes receipt events through an asynchronous serverless workflow but does not provide downstream aggregation of receipt information.
@@ -150,10 +356,15 @@ The repository is organized into application code, infrastructure, tests, script
 ```text
 kijanikiosk/
 ├── src/
-│   └── ...
+│   ├── kk-validator/
+│   ├── kk-processor/
+│   ├── kk-notifier/
+│   └── kk-analytics/
+│       └── handler.js
 ├── tests/
 │   ├── unit/
-│   │   └── smoke.test.js
+│   │   ├── smoke.test.js
+│   │   └── kk-analytics.test.js
 │   └── integration/
 │       └── smoke.test.js
 ├── scripts/
@@ -596,3 +807,13 @@ Verify the deployment has been removed using the AWS console or AWS CLI.
 * Added `npm run test:integration`.
 * Added initial smoke tests to verify the testing setup.
 * Documented local development and testing commands.
+
+### Phase 3
+
+- Added the `kk-analytics` serverless function responsibility.
+- Added receipt validation and analytics aggregation requirements.
+- Defined `receiptCount`, `totalAmount`, `firstReceiptAt`, and `lastReceiptAt`.
+- Added structured logging requirements for `eventId`, `correlationId`, `receiptId`, `function`, and `timestamp`.
+- Defined an `eventId`-based idempotency strategy.
+- Documented duplicate-event handling.
+- Added verification requirements for analytics and idempotency behaviour.
