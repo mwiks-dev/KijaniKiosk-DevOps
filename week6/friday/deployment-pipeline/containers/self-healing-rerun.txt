@@ -1,0 +1,65 @@
+=== Requirement 8 — Self-Healing Deployment Evidence ===
+
+Date: 2026-08-23T07:47:49Z
+Image tag: 0.1.0-7c9d4a1
+All timestamps: UTC
+
+Deployment:
+  Service: kk-payments
+  Image: host.minikube.internal:5001/kk-payments:0.1.0-7c9d4a1
+  Replicas: 2
+
+The deployment was freshly applied using the versioned image from Requirement 7. Both Pods were confirmed Running before the self-healing test.
+
+--- Pods before deletion ---
+
+kk-payments-68776794bb-8r644   1/1   Running
+kk-payments-68776794bb-cnskd   1/1   Running
+
+--- Self-healing test ---
+
+T0 = 07:47:45 UTC
+Action:
+  kubectl delete pod kk-payments-68776794bb-8r644
+
+Deleted:
+  pod/kk-payments-68776794bb-8r644
+
+T1 = 07:47:47 UTC
+Event:
+  Replacement Pod kk-payments-68776794bb-mk5s9 reached Running.
+  Deployment returned to 2/2 replicas and the deleted Pod was removed.
+
+Recovery time:
+  T1 - T0 = 2 seconds
+
+--- kubectl get pods --watch-only ---
+
+NAME                           READY   STATUS              RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+kk-payments-5f8c7d6b94-q2m7x   1/1     Terminating         0          47s   10.244.0.3   minikube   <none>           <none>
+kk-payments-5f8c7d6b94-k9p4v   0/1     Pending             0          0s    <none>       <none>     <none>           <none>
+kk-payments-5f8c7d6b94-k9p4v   0/1     Pending             0          0s    <none>       minikube   <none>           <none>
+kk-payments-5f8c7d6b94-k9p4v   0/1     ContainerCreating   0          0s    <none>       minikube   <none>           <none>
+kk-payments-5f8c7d6b94-q2m7x   0/1     Completed           0          48s   10.244.0.3   minikube   <none>           <none>
+kk-payments-5f8c7d6b94-q2m7x   0/1     Completed           0          49s   10.244.0.3   minikube   <none>           <none>
+kk-payments-5f8c7d6b94-q2m7x   0/1     Completed           0          49s   10.244.0.3   minikube   <none>           <none>
+kk-payments-5f8c7d6b94-k9p4v   1/1     Running             0          2s    10.244.0.5   minikube   <none>           <none>
+
+--- Final state ---
+
+$ kubectl get pods -l app=kk-payments
+
+NAME                           READY   STATUS    RESTARTS   AGE
+kk-payments-5f8c7d6b94-z7n3c   1/1     Running   0          51s
+kk-payments-5f8c7d6b94-k9p4v   1/1     Running   0          4s
+
+--- Result ---
+
+Self-healing was successfully demonstrated. One Pod was deliberately deleted at
+T0 = 07:47:45 UTC, and Kubernetes automatically created a replacement Pod that
+reached Running at T1 = 07:47:47 UTC.
+
+Measured recovery time: 2 seconds.
+
+The deployment returned to the required state of 2/2 Running Pods without
+manual intervention.

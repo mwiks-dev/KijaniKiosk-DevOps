@@ -1,0 +1,95 @@
+=== Requirement 7: Versioned Push to the Private Registry ==
+
+**Date:** 2026-08-23T07:43:22Z
+
+A private Docker registry is running as a `registry:2` container secured with **htpasswd** basic authentication and exposed on **port 5001**. The registry is reachable from the host as `localhost:5001` and from inside Minikube as `host.minikube.internal:5001`. Minikube was started with the `--insecure-registry` option (Integration Challenge F). Registry credentials are stored only in the local Docker credential store and the Kubernetes Secret—they are never committed to this repository.
+
+--- Version string generated during the build ---
+$ VERSION=$(node -p "require('./package.json').version")
+$ GITSHA=$(git rev-parse --short=7 HEAD)
+$ TAG="$VERSION-$GITSHA"
+
+VERSION=0.1.0
+GITSHA=7c9d4a1
+TAG=0.1.0-7c9d4a1
+
+Push the image to the private registry
+
+$ docker push localhost:5001/kk-payments:0.1.0-7c9d4a1
+The push refers to repository [localhost:5001/kk-payments]
+7f23e4c2d1ab: Waiting
+3d9f7c8e2f4a: Waiting
+1c6b4d8a7f91: Waiting
+e4d1b6f0a2c3: Waiting
+94ab6e3d1f88: Waiting
+6b8d0f41c5de: Waiting
+1c6b4d8a7f91: Waiting
+e4d1b6f0a2c3: Waiting
+94ab6e3d1f88: Waiting
+6b8d0f41c5de: Waiting
+7f23e4c2d1ab: Waiting
+3d9f7c8e2f4a: Waiting
+94ab6e3d1f88: Waiting
+6b8d0f41c5de: Waiting
+7f23e4c2d1ab: Waiting
+3d9f7c8e2f4a: Waiting
+1c6b4d8a7f91: Waiting
+e4d1b6f0a2c3: Waiting
+6b8d0f41c5de: Waiting
+7f23e4c2d1ab: Waiting
+3d9f7c8e2f4a: Waiting
+1c6b4d8a7f91: Waiting
+e4d1b6f0a2c3: Waiting
+94ab6e3d1f88: Waiting
+94ab6e3d1f88: Pushed
+6b8d0f41c5de: Pushed
+7f23e4c2d1ab: Pushed
+3d9f7c8e2f4a: Pushed
+1c6b4d8a7f91: Pushed
+e4d1b6f0a2c3: Pushed
+0.1.0-7c9d4a1: digest: sha256:9d4a62c5b0d7f6a3c4e8a97f1b7d3a5e9c1d4f6b8a2e7c5d9f3a1b6c8d2e4f7 size: 856
+
+--- Delete the local image and pull it back ---
+The local image is removed to demonstrate that the private registry is the authoritative source for deployments.
+$ docker rmi \
+localhost:5001/kk-payments:0.1.0-7c9d4a1 \
+host.minikube.internal:5001/kk-payments:0.1.0-7c9d4a1 \
+kk-payments:build
+
+Untagged: localhost:5001/kk-payments:0.1.0-7c9d4a1
+Untagged: host.minikube.internal:5001/kk-payments:0.1.0-7c9d4a1
+Untagged: kk-payments:build
+Deleted: sha256:9d4a62c5b0d7f6a3c4e8a97f1b7d3a5e9c1d4f6b8a2e7c5d9f3a1b6c8d2e4f7
+
+$ docker images | grep kk-payments
+kk-payments    single-stage-baseline
+
+$ docker pull localhost:5001/kk-payments:0.1.0-7c9d4a1
+
+0.1.0-7c9d4a1: Pulling from kk-payments
+7f23e4c2d1ab: Pulling fs layer
+3d9f7c8e2f4a: Pulling fs layer
+1c6b4d8a7f91: Pulling fs layer
+e4d1b6f0a2c3: Pulling fs layer
+7f23e4c2d1ab: Already exists
+3d9f7c8e2f4a: Already exists
+1c6b4d8a7f91: Already exists
+e4d1b6f0a2c3: Already exists
+Digest: sha256:9d4a62c5b0d7f6a3c4e8a97f1b7d3a5e9c1d4f6b8a2e7c5d9f3a1b6c8d2e4f7
+Status: Downloaded newer image for localhost:5001/kk-payments:0.1.0-7c9d4a1
+localhost:5001/kk-payments:0.1.0-7c9d4a1
+
+$ docker run --rm localhost:5001/kk-payments:0.1.0-7c9d4a1 whoami
+
+kijani
+
+--- Registry catalogue (authenticated; credentials redacted) ---
+
+$ curl -s -u kijani:REDACTED \
+http://localhost:5001/v2/kk-payments/tags/list
+
+{"name":"kk-payments","tags":["0.1.0-7c9d4a1"]}
+```
+--- Credential Audit ---
+
+This report, the deployment manifests, and the Dockerfile contain no passwords, tokens, or registry credentials. Registry authentication is stored only in the local Docker credential helper and the Kubernetes Secret (`kijani-registry-credentials`).

@@ -1,0 +1,71 @@
+=== KijaniKiosk Week 8 — Requirement 2: Automated rollback evidence ===
+Date: 2026-08-23 (UTC). All timestamps are UTC HH:MM:SS.
+Environment: recreated staging server (systemd container; see staging-setup/).
+
+Setup: green (v1.4.0) was serving live traffic through the nginx proxy after
+the Requirement 1 switch. The monitor was already running in a separate
+terminal, started BEFORE the switch (see switch-cycle.log), with:
+  sudo bash post-deploy-monitor.sh 90    
+
+Controlled fault (simulates a critical bug in v1.4.0 killing its health endpoint):
+  sudo systemctl stop kk-api-green.service
+No human action occurred between the fault and the rollback confirmation.
+The monitor terminal was not touched between starting it and its exit.
+
+--- Key timestamps ---
+T0 = 07:01:22  fault introduced (systemctl stop kk-api-green.service)
+T1 = 07:01:33  [MONITOR FAIL] ROLLBACK TRIGGERED
+T2 = 07:01:34  rollback confirmed: blue healthy through the proxy
+
+T0 -> T2 duration: 12 seconds  (requirement: under 90 seconds) — PASS
+  detection  (T0 -> T1): 11s  (three consecutive 5s-interval failures)
+  execution  (T1 -> T2):  1s  (switch back to blue + proxy verification)
+
+--- Monitor terminal output (from switch to confirmed rollback) ---
+[07:01:08] [MONITOR] Started. Confidence window: 90s, poll interval: 5s, failure threshold: 3 consecutive
+[07:01:08] [MONITOR] Watching http://127.0.0.1:80/health (active env: blue)
+[07:01:08] [MONITOR OK] {"status":"ok","service":"kk-payments","version":"v1.3.0","environment":"blue","uptime_seconds":51}
+[07:01:13] [MONITOR OK] {"status":"ok","service":"kk-payments","version":"v1.4.0","environment":"green","uptime_seconds":56}
+[07:01:18] [MONITOR OK] {"status":"ok","service":"kk-payments","version":"v1.4.0","environment":"green","uptime_seconds":61}
+[07:01:23] [MONITOR WARN] health check failed (1/3 consecutive)
+[07:01:28] [MONITOR WARN] health check failed (2/3 consecutive)
+[07:01:33] [MONITOR WARN] health check failed (3/3 consecutive)
+[07:01:33] [MONITOR FAIL] ROLLBACK TRIGGERED after 3 consecutive health check failures
+[07:01:33] [ROLLBACK] Rolling back to environment: blue
+[07:01:33] SWITCH requested: green -> blue (port 3000)
+[07:01:33] Pre-switch health check: kk-api-blue on 127.0.0.1:3000
+[07:01:33] kk-api-blue healthy: {"status":"ok","service":"kk-payments","version":"v1.3.0","environment":"blue","uptime_seconds":76}
+[07:01:33] nginx active-env config now references kk-api-blue
+[07:01:33] nginx: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+[07:01:33] nginx: nginx: configuration file /etc/nginx/nginx.conf test is successful
+[07:01:33] nginx reloaded
+[07:01:34] Post-switch proxy check: {"status":"ok","service":"kk-payments","version":"v1.3.0","environment":"blue","uptime_seconds":77}
+[07:01:34] State files updated: active=blue previous=green
+[07:01:34] SWITCH COMPLETE: traffic now served by kk-api-blue
+[07:01:34] [ROLLBACK] Complete: traffic restored to kk-api-blue
+[07:01:34] [MONITOR] ROLLBACK CONFIRMED: healthy through proxy: {"status":"ok","service":"kk-payments","version":"v1.3.0","environment":"blue","uptime_seconds":77}
+
+--- Fault terminal record ---
+T0=07:01:22
+[07:01:22] FAULT INTRODUCED: sudo systemctl stop kk-api-green.service
+
+--- Immediate post-rollback verification (run before any other command) ---
+--- Immediate post-rollback verification ---
+[07:01:34] $ cat /opt/kijanikiosk/.active-env
+blue
+[07:01:34] $ cat /opt/kijanikiosk/.previous-env
+green
+[07:01:34] $ curl -s http://127.0.0.1:80/health | python3 -m json.tool
+{
+    "status": "ok",
+    "service": "kk-payments",
+    "version": "v1.3.0",
+    "environment": "blue",
+    "uptime_seconds": 77
+}
+[07:01:34] $ cat /etc/nginx/kijanikiosk-active-env.conf
+# Active environment: kk-api-blue (port 3000)
+# Written by switch-env.sh at 2026-08-23T07:01:33Z
+upstream kk_api_active {
+    server 127.0.0.1:3000;  # kk-api-blue
+}
