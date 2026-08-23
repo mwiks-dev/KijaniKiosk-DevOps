@@ -1,0 +1,37 @@
+service: kijanikiosk-capstone
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: af-south-1
+  stage: ${opt:stage, 'staging'}
+
+functions:
+
+  kkReceipts:
+    handler: src/kk-receipts/handler.handler
+
+  kkProcessor:
+    handler: src/kk-processor/handler.handler
+
+  kkNotifier:
+    handler: src/kk-notifier/handler.handler
+
+  kkAnalytics:
+    handler: src/kk-analytics/handler.handler
+
+resources:
+  Resources:
+
+    OutputBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: kijanikiosk-capstone-${self:provider.stage}
+
+outputs:
+
+  OutputBucketName:
+    Value:
+      Ref: OutputBucket

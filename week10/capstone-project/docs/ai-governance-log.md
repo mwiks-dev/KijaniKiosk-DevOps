@@ -28,3 +28,15 @@ Each entry records:
 * **What was changed before applying the output:** The README was updated to document the required structured log fields, an example analytics log, the `eventId`-based idempotency strategy, duplicate-event behaviour, and verification requirements. The design explicitly avoids introducing an unnecessarily complex distributed state system at this stage.
 * **Verification planned:** Unit tests should verify that a first occurrence of an event is processed and that a duplicate `eventId` is not aggregated twice. Integration testing should later verify duplicate-event behaviour through the deployed serverless workflow.
 * **Governance consideration:** The idempotency approach was treated as a design decision requiring human review rather than automatically accepting AI-generated architecture. The implementation must be evaluated against the capstone's scope, testability, deployment environment, and production-readiness requirements before final deployment.
+
+## Entry 2
+
+* **Date:** 2026-08-23
+* **Tool used:** ChatGPT (GPT-5.6 Luna)
+* **Task description:** Complete the `kk-notifier` serverless function for Phase 4 of the Track B capstone and create unit tests for its validation, notification payload, structured logging, and handler behaviour.
+* **What was provided to the AI:** The existing `kk-notifier` skeleton:
+* **What the AI produced:** A refactored `kk-notifier` implementation with separate `validateEvent`, `createNotification`, `logNotification`, and `handler` responsibilities. The implementation validates the event identity and receipt fields, creates a structured downstream notification payload, and produces machine-readable JSON logs containing `level`, `function`, `eventType`, `eventId`, `correlationId`, `receiptId`, and `timestamp`.
+* **What it got right:** The implementation preserved the existing notification behaviour while separating responsibilities to make the function easier to test and maintain. It also added validation for `receiptId`, `amount`, and `timestamp`, ensuring malformed receipt events are rejected before downstream processing. Structured logging was aligned with the Phase 3 observability requirements.
+* **What was changed before applying the output:** The generated implementation was reviewed against the existing capstone architecture and kept deliberately small. Unit tests were added in `tests/unit/kk-notifier.test.js` covering valid events, invalid inputs, notification payload creation, default processing status, structured logging, and successful handler execution.
+* **Governance decision:** The AI-generated implementation was accepted only after checking that it preserved the existing function's intended behaviour and did not introduce unnecessary infrastructure. S3 persistence was intentionally not added at this stage because it belongs to the next Phase 4 integration step, where `kk-notifier` will write to the configured output bucket and `kk-analytics` will be triggered by an S3 `ObjectCreated` event.
+

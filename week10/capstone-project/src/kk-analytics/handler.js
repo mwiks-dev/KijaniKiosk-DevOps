@@ -1,6 +1,12 @@
 'use strict';
 
-// 1. Validation Function
+// Track event IDs that have already been processed.
+// This provides simple idempotency for the capstone.
+const processedEventIds = new Set();
+
+/**
+ * Validate the required receipt fields.
+ */
 function validateReceipt(receipt) {
   if (!receipt) {
     throw new Error('Receipt event is required');
@@ -14,12 +20,12 @@ function validateReceipt(receipt) {
     throw new Error('amount is required');
   }
 
-  if (!receipt.timestamp) {
-    throw new Error('timestamp is required');
-  }
-
   if (typeof receipt.amount !== 'number') {
     throw new Error('amount must be a number');
+  }
+
+  if (!receipt.timestamp) {
+    throw new Error('timestamp is required');
   }
 
   if (Number.isNaN(Date.parse(receipt.timestamp))) {
@@ -27,7 +33,9 @@ function validateReceipt(receipt) {
   }
 }
 
-// 2. Aggregation function
+/**
+ * Aggregate receipt information.
+ */
 function aggregateReceipts(receipts) {
   if (!receipts || receipts.length === 0) {
     return {
@@ -57,24 +65,87 @@ function aggregateReceipts(receipts) {
   };
 }
 
-// 3. Lambda handler
-module.exports.handler = async (event) => {
-  console.log(
-    'kk-analytics received event:',
-    JSON.stringify(event)
-  );
+/**
+ * Create and log a structured analytics entry.
+ */
+function logSummary({
+  eventId,
+  correlationId,
+  receiptId,
+  summary,
+  message = 'Analytics summary generated'
+}) {
+  const logEntry = {
+    eventId,
+    correlationId,
+    receiptId,
+    function: 'kk-analytics',
+    timestamp: new Date().toISOString(),
+    message,
+    summary
+  };
+
+  console.log(JSON.stringify(logEntry));
+
+  return logEntry;
+}
+
+/**
+ * Lambda handler.
+ */
+async function handler(event) {
+  const eventId = event.eventId || 'unknown';
+  const correlationId = event.correlationId || 'unknown';
+
+  // Check whether this event has already been processed.
+  if (processedEventIds.has(eventId)) {
+    const receiptId =
+      event.receipts && event.receipts.length === 1
+        ? event.receipts[0].receiptId
+        : 'multiple';
+
+    logSummary({
+      eventId,
+      correlationId,
+      receiptId,
+      summary: null,
+      message: 'Duplicate event ignored'
+    });
+    return {
+        duplicate: true,
+        eventId
+    }
+  }
 
   const receipts = event.receipts || [];
 
+  // Validate before recording the event as processed.
+  receipts.forEach(validateReceipt);
+
+  // Mark the event as processed.
+  processedEventIds.add(eventId);
+
   const summary = aggregateReceipts(receipts);
 
-  console.log(
-    'kk-analytics summary:',
-    JSON.stringify(summary)
-  );
+  const receiptId =
+    receipts.length === 1
+      ? receipts[0].receiptId
+      : 'multiple';
+
+  logSummary({
+    eventId,
+    correlationId,
+    receiptId,
+    summary
+  });
 
   return summary;
+}
+
+module.exports = {
+  handler,
+  validateReceipt,
+  aggregateReceipts,
+  logSummary,
+  processedEventIds
 };
-// Export helpers so Jest can test them
-module.exports.validateReceipt = validateReceipt;
-module.exports.aggregateReceipts = aggregateReceipts;

@@ -17,6 +17,6 @@
   "type": "commonjs",
   "devDependencies": {
     "jest": "^30.4.2",
-    "serverles": "^3.27.1"
+    "serverless": "^3.40.0"
   }
 }

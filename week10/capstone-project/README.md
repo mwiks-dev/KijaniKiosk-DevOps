@@ -107,8 +107,6 @@ A successful analytics calculation produces a structured summary such as:
 }
 ```
 
-### Phase 3.5 — Correlation and Event IDs
-
 Meaningful `kk-analytics` logs must contain consistent identifiers and metadata so that individual receipt events can be traced through the serverless workflow.
 
 The required log fields are:
@@ -149,8 +147,6 @@ The identifiers have the following purposes:
 * `timestamp` records when the log entry was generated.
 
 This structure will make the event flow easier to demonstrate and troubleshoot during the capstone presentation.
-
-### Phase 3.6 — Idempotency Strategy
 
 `kk-analytics` must have an explicit strategy for handling duplicate events.
 
@@ -237,6 +233,36 @@ Structured summary
      ↓
 Structured log
 ```
+
+### Phase 4 — Complete Four-Function Event Chain
+
+### Event Flow
+
+The Track B capstone extends the KijaniKiosk receipt workflow into a
+four-function event-driven chain:
+
+```text
+Receipt
+  ↓
+kk-receipts
+  ↓
+kk-processor
+  ↓
+kk-notifier
+  ↓
+S3 output bucket
+  ↓
+kk-analytics
+```
+**Function Responsibilities**
+
+| Function       | Responsibility                                           |
+| -------------- | -------------------------------------------------------- |
+| `kk-receipts`  | Validate and accept receipt events                       |
+| `kk-processor` | Process validated receipt events                         |
+| `kk-notifier`  | Prepare and deliver processed receipt events             |
+| `kk-analytics` | Aggregate receipt events and produce analytics summaries |
+
 
 ## 2. Problem Statement
 
@@ -817,3 +843,18 @@ Verify the deployment has been removed using the AWS console or AWS CLI.
 - Defined an `eventId`-based idempotency strategy.
 - Documented duplicate-event handling.
 - Added verification requirements for analytics and idempotency behaviour.
+
+### Phase 4**
+- Added the four-function event-chain architecture:
+  `kk-receipts → kk-processor → kk-notifier → S3 output bucket → kk-analytics`.
+- Defined explicit event boundaries for each serverless function, including triggers, inputs, processing responsibilities, outputs, destinations, permissions, errors, and logging requirements.
+- Created `docs/event-contracts.md` to document the event contracts and responsibilities of the four functions.
+- Added the `kk-receipts` serverless function for receipt validation and event forwarding.
+- Added the `kk-processor` serverless function for receipt processing and downstream event preparation.
+- Completed the `kk-notifier` serverless function with event validation, notification payload creation, structured logging, and handler response handling.
+- Added unit tests for `kk-notifier`, covering validation, notification payload creation, structured logging, successful processing, and invalid input handling.
+- Preserved `eventId`, `correlationId`, and `receiptId` across the serverless workflow for traceability.
+- Defined the S3 output bucket as the integration point between `kk-notifier` and `kk-analytics`.
+- Defined the planned S3 `ObjectCreated` event that will trigger `kk-analytics`.
+- Defined Phase 4 integration test data using receipts `R001 = 500`, `R002 = 1000`, and `R003 = 250`, with an expected total of `1750` across `3` receipts.
+- Documented machine-readable structured logging requirements across the serverless functions.
