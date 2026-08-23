@@ -1,0 +1,56 @@
+# kk-payments production image
+# Multi-stage build: the first stage handles the build process, while the final stage contains only the runtime dependencies and compiled application files.
+
+# ------------------------------------------------------------
+# Stage 1: Build
+# ------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Copy only the files required to build the application.
+COPY package.json ./
+COPY scripts/ ./scripts/
+COPY src/ ./src/
+
+# Generate the production-ready dist/ directory.
+# Build-time tooling remains in this stage and is not included in the final runtime image.
+RUN node scripts/build.js
+
+
+# ------------------------------------------------------------
+# Stage 2: Production Runtime
+# ------------------------------------------------------------
+FROM alpine:3.20
+
+# Install Node.js runtime only and create a dedicated non-root user for running the payments service.
+RUN apk add --no-cache nodejs && \
+    addgroup -S kijani && \
+    adduser -S -G kijani kijani
+
+WORKDIR /app
+
+# Copy only the compiled application and package metadata
+# from the builder stage.
+COPY --from=builder --chown=kijani:kijani /build/dist ./dist
+COPY --from=builder --chown=kijani:kijani /build/package.json ./package.json
+
+# Run the application without root privileges.
+USER kijani
+
+ENV NODE_ENV=production \
+    PORT=3001
+
+EXPOSE 3001
+
+# Check application health every 10 seconds.
+# Allow up to 30 seconds for normal startup and connection-pool initialisation before health checks begin counting failures.
+HEALTHCHECK \
+    --interval=10s \
+    --timeout=3s \
+    --start-period=30s \
+    --retries=3 \
+    CMD wget -qO- http://127.0.0.1:3001/health || exit 1
+
+# Start the production server.
+CMD ["node", "dist/server.js"]

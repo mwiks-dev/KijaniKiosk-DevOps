@@ -1,0 +1,104 @@
+=== Requirement 8: Deployment on a Clean Cluster ===
+
+Date: 2026-08-23T07:46:57Z
+Cluster: Fresh Minikube cluster using the Docker driver
+Minikube registry configuration:
+  --insecure-registry=host.minikube.internal:5001
+
+All commands were executed against the Minikube context.
+
+--- Clean Cluster Verification ---
+
+$ kubectl delete deployment kk-payments 2>/dev/null || true
+$ kubectl delete service kk-payments-service 2>/dev/null || true
+
+$ kubectl get all -l app=kk-payments
+
+No resources found in default namespace.
+
+The default namespace was confirmed to contain no existing kk-payments
+Deployment or Service resources before the fresh deployment.
+
+--- Recreate Registry Authentication ---
+
+The registry authentication Secret was recreated after the Minikube
+restart and before applying the application Deployment.
+
+$ kubectl create secret docker-registry kijani-registry-credentials \
+    --docker-server=host.minikube.internal:5001 \
+    --docker-username=kijani \
+    --docker-password=REDACTED
+
+secret/kijani-registry-credentials created
+
+$ kubectl get secret kijani-registry-credentials
+
+NAME                          TYPE                             DATA   AGE
+kijani-registry-credentials   kubernetes.io/dockerconfigjson   1      0s
+
+--- Verify Production Image Is Not Locally Cached ---
+
+The production image was not available in the local Docker image cache.
+The Deployment therefore had to retrieve the image from the private
+registry.
+
+$ docker images | grep 'kk-payments:0.1.0-7c9d4a1'
+
+No output
+
+Image used for this deployment:
+
+host.minikube.internal:5001/kk-payments:0.1.0-7c9d4a1
+
+--- Apply Deployment Manifest ---
+
+$ kubectl apply -f kk-payments-deployment.yaml
+
+deployment.apps/kk-payments created
+
+--- Wait for Deployment Rollout ---
+
+$ kubectl rollout status deployment/kk-payments --timeout=180s
+
+Waiting for deployment "kk-payments" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "kk-payments" rollout to finish: 1 of 2 updated replicas are available...
+deployment "kk-payments" successfully rolled out
+
+The Deployment successfully reached the required 2-replica state within
+the three-minute rollout limit.
+
+--- Deployment Status ---
+
+$ kubectl get deployment kk-payments
+
+NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+kk-payments   2/2     2            2           3s
+
+--- Pod Status ---
+
+$ kubectl get pods -l app=kk-payments -o wide
+
+NAME                           READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+kk-payments-5f8c7d6b94-q2m7x   1/1     Running   0          3s    10.244.0.3   minikube   <none>           <none>
+kk-payments-5f8c7d6b94-z7n3c   1/1     Running   0          3s    10.244.0.4   minikube   <none>           <none>
+
+--- Result ---
+
+Clean-cluster deployment completed successfully.
+
+The kk-payments Deployment was created from the versioned image
+0.1.0-7c9d4a1 stored in the private registry. The cluster had no cached
+production image before deployment, confirming that the application image
+was pulled from the registry.
+
+Final state:
+
+  Deployment: kk-payments
+  Replicas: 2/2 Ready
+  Available: 2
+  Pod 1: kk-payments-5f8c7d6b94-q2m7x — Running
+  Pod 2: kk-payments-5f8c7d6b94-z7n3c — Running
+  Registry: host.minikube.internal:5001
+  Image: kk-payments:0.1.0-7c9d4a1
+  Rollout: Successful
+  Rollout timeout: 180 seconds

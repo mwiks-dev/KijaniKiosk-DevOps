@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kk-payments
+  labels:
+    app: kk-payments
+
+spec:
+  # Run at least two replicas so that the loss or restart of one Pod
+  # does not make the payments service unavailable.
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: kk-payments
+
+  template:
+    metadata:
+      labels:
+        app: kk-payments
+
+    spec:
+      # Credentials used to authenticate with the private registry.
+      imagePullSecrets:
+        - name: kijani-registry-credentials
+
+      containers:
+        - name: kk-payments
+
+          # Versioned image pushed to the private registry in Requirement 7.
+          # Tag format: VERSION-GITSHA
+          image: host.minikube.internal:5001/kk-payments:0.1.0-7c9d4a1
+
+          ports:
+            - containerPort: 3001
+
+          env:
+            - name: PORT
+              value: "3001"
+
+            - name: APP_VERSION
+              value: "0.1.0-7c9d4a1"
+
+            - name: DEPLOY_ENV
+              value: "kubernetes"
+
+          # Kubernetes uses these values when scheduling and
+          # limiting resources for the payments service.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi

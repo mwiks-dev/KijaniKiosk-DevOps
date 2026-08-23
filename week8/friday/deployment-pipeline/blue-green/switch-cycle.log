@@ -1,0 +1,82 @@
+=== KijaniKiosk Week 8 — Requirement 1: Switch cycle from clean baseline ===
+
+--- Reset: confirm clean starting state ---
+[07:00:45] $ systemctl is-active kk-api-blue.service
+active
+[07:00:45] $ systemctl is-active kk-api-green.service
+active
+[07:00:45] $ curl -s http://127.0.0.1:3000/health | python3 -m json.tool
+{
+    "status": "ok",
+    "service": "kk-payments",
+    "version": "v1.3.0",
+    "environment": "blue",
+    "uptime_seconds": 29
+}
+[07:00:46] $ curl -s http://127.0.0.1:3001/health | python3 -m json.tool
+{
+    "status": "ok",
+    "service": "kk-payments",
+    "version": "v1.4.0",
+    "environment": "green",
+    "uptime_seconds": 29
+}
+[07:00:46] $ sudo bash /opt/kijanikiosk/scripts/switch-env.sh blue
+[07:00:46] SWITCH requested: blue -> blue (port 3000)
+[07:00:46] Pre-switch health check: kk-api-blue on 127.0.0.1:3000
+[07:00:46] kk-api-blue healthy: {"status":"ok","service":"kk-payments","version":"v1.3.0","environment":"blue","uptime_seconds":29}
+[07:00:46] nginx active-env config now references kk-api-blue
+[07:00:46] nginx: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+[07:00:46] nginx: nginx: configuration file /etc/nginx/nginx.conf test is successful
+[07:00:46] nginx reloaded
+[07:00:47] Post-switch proxy check: {"status":"ok","service":"kk-payments","version":"v1.3.0","environment":"blue","uptime_seconds":30}
+[07:00:47] State files updated: active=blue previous=blue
+[07:00:47] SWITCH COMPLETE: traffic now served by kk-api-blue
+exit code: 0
+[07:00:47] $ curl -s http://127.0.0.1:80/health | python3 -m json.tool
+{
+    "status": "ok",
+    "service": "kk-payments",
+    "version": "v1.3.0",
+    "environment": "blue",
+    "uptime_seconds": 30
+}
+[07:00:47] $ cat /opt/kijanikiosk/.active-env
+blue
+[07:00:47] $ cat /opt/kijanikiosk/.previous-env
+blue
+
+Clean baseline confirmed: blue active on v1.3.0, green healthy on v1.4.0, nginx -> blue.
+
+--- Requirement 1: switch blue -> green (monitor started FIRST, in separate terminal) ---
+[07:01:08] Monitor started in separate terminal (post-deploy-monitor.sh 90, PID 148)
+[07:01:11] $ sudo bash /opt/kijanikiosk/scripts/switch-env.sh green
+[07:01:11] SWITCH requested: blue -> green (port 3001)
+[07:01:11] Pre-switch health check: kk-api-green on 127.0.0.1:3001
+[07:01:11] kk-api-green healthy: {"status":"ok","service":"kk-payments","version":"v1.4.0","environment":"green","uptime_seconds":54}
+[07:01:11] nginx active-env config now references kk-api-green
+[07:01:11] nginx: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+[07:01:11] nginx: nginx: configuration file /etc/nginx/nginx.conf test is successful
+[07:01:11] nginx reloaded
+[07:01:12] Post-switch proxy check: {"status":"ok","service":"kk-payments","version":"v1.4.0","environment":"green","uptime_seconds":55}
+[07:01:12] State files updated: active=green previous=blue
+[07:01:12] SWITCH COMPLETE: traffic now served by kk-api-green
+exit code: 0
+[07:01:12] $ curl -s http://127.0.0.1:80/health | python3 -m json.tool
+{
+    "status": "ok",
+    "service": "kk-payments",
+    "version": "v1.4.0",
+    "environment": "green",
+    "uptime_seconds": 55
+}
+[07:01:12] $ cat /opt/kijanikiosk/.active-env
+green
+[07:01:12] $ cat /opt/kijanikiosk/.previous-env
+blue
+[07:01:12] $ cat /etc/nginx/kijanikiosk-active-env.conf
+# Active environment: kk-api-green (port 3001)
+# Written by switch-env.sh at 2026-08-23T07:01:11Z
+upstream kk_api_active {
+    server 127.0.0.1:3001;  
+}
