@@ -1,0 +1,197 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'af-south-1'
+        AWS_REGION = 'af-south-1'
+
+        // Jenkins Credentials ID.
+        // The actual AWS credentials remain stored in Jenkins.
+        AWS_CREDENTIALS_ID = 'aws-credentials'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+
+                checkout scm
+
+                sh '''
+                    echo "Git commit:"
+                    git rev-parse --short HEAD
+
+                    echo "Branch:"
+                    git branch --show-current
+                '''
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                echo 'Installing Node.js dependencies...'
+
+                sh '''
+                    node --version
+                    npm --version
+                    npm ci
+                '''
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                echo 'Running unit tests...'
+
+                sh '''
+                    npm test
+                '''
+            }
+        }
+
+        stage('Package Serverless Application') {
+            steps {
+                echo 'Packaging Serverless application...'
+
+                sh '''
+                    npx serverless package --stage staging
+                '''
+            }
+        }
+
+        stage('Deploy Staging') {
+            steps {
+                echo 'Deploying Serverless application to staging...'
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
+                ]) {
+                    sh '''
+                        npx serverless deploy --stage staging
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Staging Deployment') {
+            steps {
+                echo 'Verifying staging deployment...'
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
+                ]) {
+                    sh '''
+                        npx serverless info --stage staging
+                    '''
+                }
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                echo 'Running staging integration tests...'
+
+                sh '''
+                    npm run test:integration
+                '''
+            }
+        }
+
+        stage('Production Approval') {
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input(
+                        message: 'Staging deployment and integration tests passed. Deploy to production?',
+                        ok: 'Approve Production Deployment'
+                    )
+                }
+            }
+        }
+
+        stage('Deploy Production') {
+            steps {
+                echo 'Deploying Serverless application to production...'
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
+                ]) {
+                    sh '''
+                        npx serverless deploy --stage production
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Production') {
+            steps {
+                echo 'Verifying production deployment...'
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${AWS_CREDENTIALS_ID}"]
+                ]) {
+                    sh '''
+                        npx serverless info --stage production
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo '''
+            ==========================================
+            KijaniKiosk CI/CD Pipeline PASSED
+            ==========================================
+            Staging deployment:      PASS
+            Integration tests:       PASS
+            Production approval:     APPROVED
+            Production deployment:   PASS
+            Production verification: PASS
+            ==========================================
+            '''
+        }
+
+        failure {
+            echo '''
+            ==========================================
+            KijaniKiosk CI/CD Pipeline FAILED
+            ==========================================
+            Production deployment will not continue
+            if an earlier required stage fails.
+            ==========================================
+            '''
+        }
+
+        aborted {
+            echo '''
+            ==========================================
+            KijaniKiosk CI/CD Pipeline ABORTED
+            ==========================================
+            No further deployment stages will execute.
+            ==========================================
+            '''
+        }
+
+        always {
+            echo 'Cleaning Jenkins workspace...'
+
+            cleanWs(
+                deleteDirs: true,
+                disableDeferredWipeout: true
+            )
+        }
+    }
+}

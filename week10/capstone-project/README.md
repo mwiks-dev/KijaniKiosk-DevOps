@@ -330,6 +330,37 @@ The staging receipt bucket has been provisioned, and a separate output bucket ha
 
 The use of separate staging resources prevents development and integration testing activities from affecting future production deployments.
 
+### Phase 7 — Jenkins CI/CD
+
+Phase 7 introduces the continuous integration and continuous delivery workflow for the KijaniKiosk Track B capstone.
+
+Jenkins is used to automate testing, packaging, staging deployment, staging verification, integration testing, and controlled production promotion.
+
+The pipeline follows this sequence:
+
+```text
+Checkout
+   ↓
+Install Dependencies
+   ↓
+Unit Tests
+   ↓
+Package
+   ↓
+Deploy Staging
+   ↓
+Verify Staging
+   ↓
+Integration Test
+   ↓
+PASS
+   ↓
+Human Approval
+   ↓
+Deploy Production
+   ↓
+Verify Production
+```
 
 ## 2. Problem Statement
 
@@ -958,3 +989,38 @@ Verify the deployment has been removed using the AWS console or AWS CLI.
 - Confirmed separation between staging and future production resources.
 - Verified that the staging output bucket currently contains no S3 event notifications prior to connecting kk-analytics.
 - Prepared the staging environment for end-to-end event-driven integration and testing.
+
+### Phase 7
+- Added Jenkins CI/CD pipeline configuration in `Jenkinsfile`.
+
+- Defined the automated delivery sequence from source checkout through production verification.
+
+- Added dependency installation using `npm ci`.
+
+- Added automated unit testing using `npm test`.
+
+- Added Serverless packaging using `npx serverless package --stage staging`.
+
+- Added automated staging deployment using `npx serverless deploy --stage staging`.
+
+- Added staging deployment verification using `npx serverless info --stage staging`.
+
+- Added staging integration testing using `npm run test:integration`.
+
+- Added an explicit human approval gate before production deployment.
+
+- Added production deployment using `npx serverless deploy --stage production`.
+
+- Added production verification using `npx serverless info --stage production`.
+
+- Configured the pipeline to prevent concurrent Jenkins builds.
+
+- Added Jenkins workspace cleanup after pipeline execution.
+
+- Defined Jenkins credential management for AWS authentication.
+
+- Ensured AWS access keys and secret keys are not stored directly in the repository or `Jenkinsfile`.
+
+- Established the required promotion sequence of staging deployment → integration testing → PASS → human approval → production deployment.
+
+- Defined failure behaviour so that failed staging or integration validation prevents production promotion.
