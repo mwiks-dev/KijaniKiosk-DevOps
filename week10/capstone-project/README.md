@@ -2,10 +2,21 @@
 
 ## 1. Project Overview
 ### Phase 0 — Project Foundation
-- Initialized Track B repository.
-- Established repository structure.
-- Created README and AI governance framework.
-- No application components implemented yet.
+The capstone repository was initialized with separate directories for
+serverless handlers, Kubernetes configuration, testing, scripts,
+documentation, and evidence.
+
+The project uses feature branches, conventional commits, pull requests,
+and documented AI governance throughout development.
+
+### Phase 1 — Scope and Architecture
+
+Track B was selected because the capstone extends the existing
+KijaniKiosk serverless receipt architecture into a complete event-driven
+workflow with downstream analytics.
+
+The central integration seam is the flow from the Kubernetes
+`kk-payments` service into the serverless receipt chain.
 
 ## 2. Problem Statement
 
